@@ -1,10 +1,15 @@
-<?php namespace PseudoCrypt;
+<?php
+
+namespace PseudoCrypt;
  
-class PseudoCrypt {
- 
-    /* Key: Next prime greater than 62 ^ n / 1.618033988749894848 */
+class PseudoCrypt
+{
+    private static $bases = [62,36,10];
+
+    /* Key: Next prime greater than 36 ^ n / 1.618033988749894848 */
     /* Value: modular multiplicative inverse */
-    private static $golden_primes = array(
+    private static $golden_primes = [
+      62 => [
         '1'                  => '1',
         '41'                 => '59',
         '2377'               => '1677',
@@ -16,11 +21,52 @@ class PseudoCrypt {
         '134941606358731'    => '88879354792675',
         '8366379594239857'   => '7275288500431249',
         '518715534842869223' => '280042546585394647'
-    );
- 
-    /* Ascii :                    0  9,         A  Z,         a  z     */
-    /* $chars = array_merge(range(48,57), range(65,90), range(97,122)) */
-    private static $chars62 = array(
+      ],
+      36 => [
+        '1'                => '1',
+        '23'               => '11',
+        '809'              => '809',
+        '28837'            => '29485',
+        '1038073'          => '179017',
+        '37370153'         => '47534873',
+        '1345325473'       => '264202849',
+        '48431716939'      => '19727015779',
+        '1743541808839'    => '1532265214711',
+        '62767505117101'   => '67935388019749',
+        '2259630184213741' => '1860570115018981',
+      ],
+      26 => [
+        '1'               => '1',
+        '17'              => '23',
+        '419'             => '555',
+        '10867'           => '4003',
+        '282427'          => '200259',
+        '7343107'         => '6405355',
+        '190920451'       => '166406827',
+        '4963931759'      => '2348544655',
+        '129062223683'    => '99013302891',
+        '3355617815651'   => '1020941221707',
+        '87246063206927'  => '95795217660143',
+      ],
+      10 => [
+        '1' => '1',
+        '7' => '3',
+        '67' => '3',
+        '619' => '979',
+        '6197' => '1533',
+        '61813' => '30877',
+        '618041' => '519561',
+        '6180341' => '9991261',
+        '61803419' => '32652179',
+        '618034003' => '270440667',
+        '6180339923' => '229552987'
+      ]
+    ];
+
+    private static $chars = [
+      /* Ascii :                    0  9          A  Z          a  z     */
+      /* $chars = array_merge(range(48,57), range(65,90), range(97,122)) */
+      62 => [
         0=>48,1=>49,2=>50,3=>51,4=>52,5=>53,6=>54,7=>55,8=>56,9=>57,10=>65,
         11=>66,12=>67,13=>68,14=>69,15=>70,16=>71,17=>72,18=>73,19=>74,20=>75,
         21=>76,22=>77,23=>78,24=>79,25=>80,26=>81,27=>82,28=>83,29=>84,30=>85,
@@ -28,44 +74,64 @@ class PseudoCrypt {
         41=>102,42=>103,43=>104,44=>105,45=>106,46=>107,47=>108,48=>109,49=>110,
         50=>111,51=>112,52=>113,53=>114,54=>115,55=>116,56=>117,57=>118,58=>119,
         59=>120,60=>121,61=>122
-    );
- 
-    public static function base62($int) {
+      ],
+      /* Ascii :                    0  9          A  Z    */
+      /* $chars = array_merge(range(48,57), range(65,90)) */
+      36 => [
+        0=>48,1=>49,2=>50,3=>51,4=>52,5=>53,6=>54,7=>55,8=>56,9=>57,10=>65,
+        11=>66,12=>67,13=>68,14=>69,15=>70,16=>71,17=>72,18=>73,19=>74,20=>75,
+        21=>76,22=>77,23=>78,24=>79,25=>80,26=>81,27=>82,28=>83,29=>84,30=>85,
+        31=>86,32=>87,33=>88,34=>89,35=>90,
+      ],
+      /* Ascii :        A  Z   */
+      /* $chars = range(65,90) */
+      26 => [
+        0=>65,1=>66,2=>67,3=>68,4=>69,5=>70,6=>71,7=>72,8=>73,9=>74,
+        10=>75,11=>76,12=>77,13=>78,14=>79,15=>80,16=>81,17=>82,18=>83,19=>84,
+        20=>85,21=>86,22=>87,23=>88,24=>89,25=>90,
+      ],
+      /* Ascii :        0  9   */
+      /* $chars = range(48,57) */
+      10 => [
+        0=>48,1=>49,2=>50,3=>51,4=>52,5=>53,6=>54,7=>55,8=>56,9=>57
+      ],
+    ];
+
+    public static function rebase($int, $base = 62) {
         $key = "";
         while(bccomp($int-1, 0) > 0) {
-            $mod = bcmod($int, 62);
-            $key .= chr(self::$chars62[$mod]);
-            $int = bcdiv($int, 62);
+            $mod = bcmod($int, $base);
+            $key .= chr(self::$chars[$base][$mod]);
+            $int = bcdiv($int, $base);
         }
         return strrev($key);
     }
  
-    public static function hash($num, $len = 5) {
-        $ceil = bcpow(62, $len);
-        $primes = array_keys(self::$golden_primes);
+    public static function hash($num, $len = 5, $base = 62) {
+        $ceil = bcpow($base, $len);
+        $primes = array_keys(self::$golden_primes[$base]);
         $prime = $primes[$len];
         $dec = bcmod(bcmul($num, $prime), $ceil);
-        $hash = self::base62($dec);
-        return str_pad($hash, $len, "0", STR_PAD_LEFT);
+        $hash = self::rebase($dec, $base);
+        return str_pad($hash, $len, chr(self::$chars[$base][0]), STR_PAD_LEFT);
     }
  
-    public static function unbase62($key) {
+    public static function unbase($key, $base = 62) {
         $int = 0;
         foreach(str_split(strrev($key)) as $i => $char) {
-            $dec = array_search(ord($char), self::$chars62);
-            $int = bcadd(bcmul($dec, bcpow(62, $i)), $int);
+            $dec = array_search(ord($char), self::$chars[$base]);
+            $int = bcadd(bcmul($dec, bcpow($base, $i)), $int);
         }
         return $int;
     }
  
-    public static function unhash($hash) {
+    public static function unhash($hash, $base = 62) {
         $len = strlen($hash);
-        $ceil = bcpow(62, $len);
-        $mmiprimes = array_values(self::$golden_primes);
+        $ceil = bcpow($base, $len);
+        $mmiprimes = array_values(self::$golden_primes[$base]);
         $mmi = $mmiprimes[$len];
-        $num = self::unbase62($hash);
+        $num = self::unbase($hash, $base);
         $dec = bcmod(bcmul($num, $mmi), $ceil);
         return $dec;
     }
- 
 }
